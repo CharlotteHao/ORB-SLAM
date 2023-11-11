@@ -43,41 +43,83 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
-Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor):
-    mState(NO_IMAGES_YET), mSensor(sensor), mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
-    mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
-    mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
+/**
+ * !Tracking的构造函数
+ * todo step1: 从配置文件TUMX.yaml中，加载相机参数(如K，图像校正参数，双目摄像头baseline和相机的帧频率等)
+ * todo step2: 加载ORB特帧点有关的参数。（如：特帧点数，金字塔的变化尺度，金字塔的层数，关键点的阈值等等)。并新建相应传感器的特征点提取器
+ */ 
+Tracking::Tracking(
+    System *pSys,                   //系统实例
+    ORBVocabulary* pVoc,            //BOW字典
+    FrameDrawer *pFrameDrawer,      //帧绘画器
+    MapDrawer *pMapDrawer,          //地图点绘画器
+    Map *pMap,                      //地图句柄
+    KeyFrameDatabase* pKFDB,        //关键帧产生的词袋数据库
+    const string &strSettingPath,   //配置文件路径
+    const int sensor                //传感器类型
+    ):              
+        mState(NO_IMAGES_YET),                             //当前系统还没有准备好                            
+        mSensor(sensor),                                   
+        mbOnlyTracking(false),                             //处于SLAM模式
+        mbVO(false),                                       //当处于纯跟踪模式的时候，这个变量表示当前跟踪的好坏
+        mpORBVocabulary(pVoc),
+        mpKeyFrameDB(pKFDB),                               
+        mpInitializer(static_cast<Initializer*>(NULL)),    //暂时给地图初始化器设置为空指针
+        mpSystem(pSys),                                     
+        mpViewer(NULL), 
+        mpFrameDrawer(pFrameDrawer),                       //可视化的查看器是可选的，因为ORB—SLAM2最终被编译成一个库，被人拿来用时不需要中间的图画过程 
+        mpMapDrawer(pMapDrawer), 
+        mpMap(pMap), 
+        mnLastRelocFrameId(0)                              //恢复为0，没有进行这个过程的时候的默认值
 {
     // Load camera parameters from settings file
 
+    /**
+     * *step1：从配置文件中，加载相机参数
+     */
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
     float fx = fSettings["Camera.fx"];
     float fy = fSettings["Camera.fy"];
     float cx = fSettings["Camera.cx"];
     float cy = fSettings["Camera.cy"];
 
+    /**    
+     *     |fx  0   cx|
+     *  K= |0   fy  cy|
+     *     |0   0   1 |
+    */  
     cv::Mat K = cv::Mat::eye(3,3,CV_32F);
     K.at<float>(0,0) = fx;
     K.at<float>(1,1) = fy;
     K.at<float>(0,2) = cx;
     K.at<float>(1,2) = cy;
+    //把外参K拷贝给成员变量
     K.copyTo(mK);
 
+    /**
+     * 图像校正参数（畸变系数）
+     * [k1,k2,p1,p2,k3]
+    */
     cv::Mat DistCoef(4,1,CV_32F);
     DistCoef.at<float>(0) = fSettings["Camera.k1"];
     DistCoef.at<float>(1) = fSettings["Camera.k2"];
     DistCoef.at<float>(2) = fSettings["Camera.p1"];
     DistCoef.at<float>(3) = fSettings["Camera.p2"];
     const float k3 = fSettings["Camera.k3"];
+    //有些相机的畸变系数中会没有k3项
     if(k3!=0)
     {
         DistCoef.resize(5);
         DistCoef.at<float>(4) = k3;
     }
+    //把畸变系数拷贝给成员变量
     DistCoef.copyTo(mDistCoef);
 
+
+    //双目摄像头baseline*fx
     mbf = fSettings["Camera.bf"];
 
+    //相机的帧频率
     float fps = fSettings["Camera.fps"];
     if(fps==0)
         fps=30;
@@ -86,6 +128,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     mMinFrames = 0;
     mMaxFrames = fps;
 
+    //输出参数信息
     cout << endl << "Camera Parameters: " << endl;
     cout << "- fx: " << fx << endl;
     cout << "- fy: " << fy << endl;
@@ -99,31 +142,52 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     cout << "- p2: " << DistCoef.at<float>(3) << endl;
     cout << "- fps: " << fps << endl;
 
-
+    //RGB的颜色顺序 0: BGR, 1: RGB
     int nRGB = fSettings["Camera.RGB"];
     mbRGB = nRGB;
-
     if(mbRGB)
         cout << "- color order: RGB (ignored if grayscale)" << endl;
     else
         cout << "- color order: BGR (ignored if grayscale)" << endl;
 
-    // Load ORB parameters
 
+
+
+
+    // Load ORB parameters
+    /**
+     * *step2：加载ORB特帧点有关的参数，并新建特征点提取器
+    */
+    //每一帧提取的特帧点数 T UM1配置文件中指定为1000
     int nFeatures = fSettings["ORBextractor.nFeatures"];
+    //图像建立金字塔时的变化尺度  单目TUM1配置文件中指定为1.2
     float fScaleFactor = fSettings["ORBextractor.scaleFactor"];
+    //图像金字塔的层数  单目TUM1配置文件中指定为8
     int nLevels = fSettings["ORBextractor.nLevels"];
+    //提取ORB特帧中的fast关键点的默认阈值  单目TUM1配置文件中指定为20
     int fIniThFAST = fSettings["ORBextractor.iniThFAST"];
+    //如果默认阈值提取不出足够的特征点，则使用最小阈值  单目TUM1配置文件中指定为7
     int fMinThFAST = fSettings["ORBextractor.minThFAST"];
 
-    mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+    //tracking过程中，不管单目，双目还是RGBD，都会用到mpORBextractorLeft作为特帧点提取器
+    mpORBextractorLeft = new ORBextractor(
+        nFeatures,          //参数的含义看上面注释
+        fScaleFactor,
+        nLevels,
+        fIniThFAST,
+        fMinThFAST);
 
+
+    //如果是双目，tracking过程中都会用到mpORBextractorRight作为右目的特帧点提取器
     if(sensor==System::STEREO)
         mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
+    //在单目初始化的时候，会用mpIniORBextractor来作为特帧点提取器
     if(sensor==System::MONOCULAR)
+        //单目初始化的时候要提取两倍的nFeatures数量的特征点
         mpIniORBextractor = new ORBextractor(2*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
+    //输出信息
     cout << endl  << "ORB Extractor Parameters: " << endl;
     cout << "- Number of Features: " << nFeatures << endl;
     cout << "- Scale Levels: " << nLevels << endl;
@@ -131,14 +195,17 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     cout << "- Initial Fast Threshold: " << fIniThFAST << endl;
     cout << "- Minimum Fast Threshold: " << fMinThFAST << endl;
 
+    //如果是双目或者是RGBD
     if(sensor==System::STEREO || sensor==System::RGBD)
-    {
+    {   //计算阈值：判断一个3D点是远点还是近点。mThDepth=mbf*35/fx
         mThDepth = mbf*(float)fSettings["ThDepth"]/fx;
         cout << endl << "Depth Threshold (Close/Far Points): " << mThDepth << endl;
     }
 
+    //如果是RGB摄像机
     if(sensor==System::RGBD)
-    {
+    {   
+        //深度摄像机 disparity转化为depth的因子
         mDepthMapFactor = fSettings["DepthMapFactor"];
         if(fabs(mDepthMapFactor)<1e-5)
             mDepthMapFactor=1;
@@ -235,10 +302,15 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
 }
 
 
-cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
+
+cv::Mat Tracking::GrabImageMonocular(
+    const cv::Mat &im,      //单目图像
+    const double &timestamp //时间戳
+    )
 {
     mImGray = im;
 
+    //step1：如果是3通道的RGB或者是四通道的RGBA，都要转换为单通道的灰度图
     if(mImGray.channels()==3)
     {
         if(mbRGB)
@@ -254,15 +326,36 @@ cv::Mat Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp)
             cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
     }
 
+    // step2：构造Frame
     if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
-        mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+        mCurrentFrame = Frame(
+            mImGray,            //灰度图
+            timestamp,          //时间戳
+            mpIniORBextractor,  //ORB特征提取器
+            mpORBVocabulary,    //ORB词袋
+            mK,                 //相机外参K
+            mDistCoef,          //畸变参数
+            mbf,                //双目的bf，单目不会用到
+            mThDepth            //RGB-D的depth，单目不会用到
+        );
     else
-        mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth);
+        mCurrentFrame = Frame(
+            mImGray,
+            timestamp,
+            mpORBextractorLeft,
+            mpORBVocabulary,
+            mK,
+            mDistCoef,
+            mbf,
+            mThDepth
+        );
 
     Track();
 
     return mCurrentFrame.mTcw.clone();
 }
+
+
 
 void Tracking::Track()
 {

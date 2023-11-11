@@ -22,6 +22,9 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 
+//自己修改的26
+#include <unistd.h>
+
 #include<string>
 #include<thread>
 #include<opencv2/core/core.hpp>
@@ -50,6 +53,7 @@ class System
 {
 public:
     // Input sensor
+    //这个枚举类型用于 表示本系统所使用的传感器类型
     enum eSensor{
         MONOCULAR=0,
         STEREO=1,
@@ -59,7 +63,11 @@ public:
 public:
 
     // Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
-    System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor, const bool bUseViewer = true);
+    //!构造函数，用于初始化整个系统
+    System(const string &strVocFile,        //指定ORB词袋文件的路径
+           const string &strSettingsFile,   //指定配置文件的路径
+           const eSensor sensor,            //指定所使用的传感器类型
+           const bool bUseViewer = true);   //指定是否使用可视化界面
 
     // Proccess the given stereo frame. Images must be synchronized and rectified.
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.

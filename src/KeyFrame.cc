@@ -69,6 +69,7 @@ void KeyFrame::ComputeBoW()
 
 void KeyFrame::SetPose(const cv::Mat &Tcw_)
 {
+    //加锁，读写互斥
     unique_lock<mutex> lock(mMutexPose);
     Tcw_.copyTo(Tcw);
     cv::Mat Rcw = Tcw.rowRange(0,3).colRange(0,3);
@@ -85,6 +86,7 @@ void KeyFrame::SetPose(const cv::Mat &Tcw_)
 
 cv::Mat KeyFrame::GetPose()
 {
+    //加锁，读写互斥。锁的有效性只在{ }之内，出了大括号就释放锁了
     unique_lock<mutex> lock(mMutexPose);
     return Tcw.clone();
 }
@@ -553,6 +555,7 @@ bool KeyFrame::isBad()
 void KeyFrame::EraseConnection(KeyFrame* pKF)
 {
     bool bUpdate = false;
+    //第一部分加锁
     {
         unique_lock<mutex> lock(mMutexConnections);
         if(mConnectedKeyFrameWeights.count(pKF))
@@ -560,7 +563,7 @@ void KeyFrame::EraseConnection(KeyFrame* pKF)
             mConnectedKeyFrameWeights.erase(pKF);
             bUpdate=true;
         }
-    }
+    }//出了大括号，锁就释放了
 
     if(bUpdate)
         UpdateBestCovisibles();

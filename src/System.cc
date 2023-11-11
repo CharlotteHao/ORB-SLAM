@@ -29,9 +29,28 @@
 namespace ORB_SLAM2
 {
 
-System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
-               const bool bUseViewer):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
-        mbDeactivateLocalizationMode(false)
+
+/**
+ * !SLAM系统的构造函数，将会启动其他线程
+ * todo step1：读取配置文件信息
+ * todo step2：创建ORB词袋
+ * todo step3：创建关键帧数据库
+ * todo step4：创建地图
+ * todo step5：初始化Tracking进程
+ * todo ...
+*/
+System::System(
+        const string &strVocFile,           //词袋文件路径
+        const string &strSettingsFile,      //配置文件路径
+        const eSensor sensor,               //传感器类型
+        const bool bUseViewer               //是否使用可视化界面
+        )
+        :
+        mSensor(sensor),                        //初始化传感器类型
+        mpViewer(static_cast<Viewer*>(NULL)),   //空对象指针 TODO
+        mbReset(false),                         //无复位标志
+        mbActivateLocalizationMode(false),      //没有这个模式转换标志
+        mbDeactivateLocalizationMode(false)     //没有这个模式转换标志
 {
     // Output welcome message
     cout << endl <<
@@ -40,8 +59,8 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     "This is free software, and you are welcome to redistribute it" << endl <<
     "under certain conditions. See LICENSE.txt." << endl << endl;
 
+    //输出传感器类型
     cout << "Input sensor was set to: ";
-
     if(mSensor==MONOCULAR)
         cout << "Monocular" << endl;
     else if(mSensor==STEREO)
@@ -49,20 +68,30 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     else if(mSensor==RGBD)
         cout << "RGB-D" << endl;
 
-    //Check settings file
-    cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
+
+    /**
+     * *step1：读取配置文件信息
+     */
+    cv::FileStorage fsSettings(strSettingsFile.c_str(),     
+                                   cv::FileStorage::READ);      //只读
+    //如果打开失败，输出调试信息，退出系统
     if(!fsSettings.isOpened())
-    {
+    {   
        cerr << "Failed to open settings file at: " << strSettingsFile << endl;
        exit(-1);
     }
 
 
-    //Load ORB Vocabulary
+    /**
+     * *step2：创建ORB词袋
+     */
     cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
-
-    mpVocabulary = new ORBVocabulary();
+    //建立一个新的ORB词袋
+    //ORBVocabulary是第三方库的类，不需要点进去看
+    mpVocabulary = new ORBVocabulary(); 
+    //获取字典加载状态
     bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+    //如果加载失败，输出调试信息，退出系统
     if(!bVocLoad)
     {
         cerr << "Wrong path to vocabulary. " << endl;
@@ -71,20 +100,42 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     }
     cout << "Vocabulary loaded!" << endl << endl;
 
-    //Create KeyFrame Database
+
+
+
+    /**
+     * *step3：创建关键帧数据库。
+     * */
     mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
 
-    //Create the Map
+
+
+    /**
+     * *step4：创建地图
+     * */
     mpMap = new Map();
 
     //Create Drawers. These are used by the Viewer
+    //这里的帧绘制器和地图绘制器将会被可视化的Viewer所使用
     mpFrameDrawer = new FrameDrawer(mpMap);
     mpMapDrawer = new MapDrawer(mpMap, strSettingsFile);
 
+
+
+
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
-    mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
-                             mpMap, mpKeyFrameDatabase, strSettingsFile, mSensor);
+    /**
+     * *step5：在本主进程中，初始化追踪进程
+    */
+    mpTracker = new Tracking(this,                  //还不明白 TODO
+                             mpVocabulary,          //字典
+                             mpFrameDrawer,         //帧绘制器
+                             mpMapDrawer,           //地图绘制器
+                             mpMap,                 //地图
+                             mpKeyFrameDatabase,    //关键帧数据库
+                             strSettingsFile,       //配置文件路径
+                             mSensor);              //传感器类型
 
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR);
@@ -215,6 +266,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     return Tcw;
 }
 
+//输入为单目图像时的追踪器接口
 cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
 {
     if(mSensor!=MONOCULAR)
@@ -223,9 +275,11 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
         exit(-1);
     }
 
-    // Check mode change
+    // 模式判断
     {
+        //互斥锁，出了{}则释放该锁，为了防止mbActivateLocalizationMode和mbDeactivateLocalizationMode的值发生混乱
         unique_lock<mutex> lock(mMutexMode);
+        //mbActivateLocalizationMode为True，则关闭局部建图线程
         if(mbActivateLocalizationMode)
         {
             mpLocalMapper->RequestStop();
@@ -235,10 +289,13 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
             {
                 usleep(1000);
             }
-
+            //局部地图关闭后，只进行追踪的线程，只计算相机的位姿，没有对局部地图进行更新
+            //设置mbOnlyTracking成员变量为真    
             mpTracker->InformOnlyTracking(true);
+            //关闭线程，可以使得别的线程得到更多的资源
             mbActivateLocalizationMode = false;
         }
+        //mbDeactivateLocalizationMode为真，则局部建图线程就被释放了，关键帧从局部地图中删除
         if(mbDeactivateLocalizationMode)
         {
             mpTracker->InformOnlyTracking(false);
@@ -248,17 +305,24 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     }
 
     // Check reset
+    //检测复位
     {
-    unique_lock<mutex> lock(mMutexReset);
-    if(mbReset)
-    {
-        mpTracker->Reset();
-        mbReset = false;
-    }
+        unique_lock<mutex> lock(mMutexReset);
+        if(mbReset)
+        {
+            mpTracker->Reset();
+            mbReset = false;
+        }
     }
 
+    //获取相机位姿估计的结果
+    /**
+     * 参数一：图片
+     * 参数二：该图片对应的时间戳
+    */
     cv::Mat Tcw = mpTracker->GrabImageMonocular(im,timestamp);
 
+    //更新状态
     unique_lock<mutex> lock2(mMutexState);
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;

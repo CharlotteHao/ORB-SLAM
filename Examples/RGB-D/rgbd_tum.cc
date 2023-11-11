@@ -37,18 +37,29 @@ int main(int argc, char **argv)
 {
     if(argc != 5)
     {
+        /**
+         * 运行项目指令：./rgbd_tum path_to_vocabulary path_to_settings path_to_sequence path_to_association
+         *      ./rgbd_tum: 编译出来的可执行程序
+         *      path_to_vocabulary： 词袋的路径
+         *      path_to_settings：相机的配置文件
+         *      path_to_sequence：数据集文件
+         *      path_to_association：左右目配置文件
+         */
         cerr << endl << "Usage: ./rgbd_tum path_to_vocabulary path_to_settings path_to_sequence path_to_association" << endl;
         return 1;
     }
 
-    // Retrieve paths to images
+    // step1：读取图片以及左右目配置文件
     vector<string> vstrImageFilenamesRGB;
     vector<string> vstrImageFilenamesD;
     vector<double> vTimestamps;
-    string strAssociationFilename = string(argv[4]);
+    string strAssociationFilename = string(argv[4]);    //argv[4]是左右目配置文件
+    //后三个是传出参数
     LoadImages(strAssociationFilename, vstrImageFilenamesRGB, vstrImageFilenamesD, vTimestamps);
 
-    // Check consistency in the number of images and depthmaps
+
+
+    // step2：检查图片以及输入文件的一致性
     int nImages = vstrImageFilenamesRGB.size();
     if(vstrImageFilenamesRGB.empty())
     {
@@ -61,7 +72,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Create SLAM system. It initializes all system threads and gets ready to process frames.
+
+    // step3：创建一个SLAM对象，它是一个 ORB_SLAM2::System 类型的变量
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::RGBD,true);
 
     // Vector for tracking time statistics
@@ -72,11 +84,11 @@ int main(int argc, char **argv)
     cout << "Start processing sequence ..." << endl;
     cout << "Images in the sequence: " << nImages << endl << endl;
 
-    // Main loop
+    //step4：遍历图片，进行SLAM
     cv::Mat imRGB, imD;
     for(int ni=0; ni<nImages; ni++)
     {
-        // Read image and depthmap from file
+        // 4.1：读取图片。 argv[3]是数据集文件
         imRGB = cv::imread(string(argv[3])+"/"+vstrImageFilenamesRGB[ni],CV_LOAD_IMAGE_UNCHANGED);
         imD = cv::imread(string(argv[3])+"/"+vstrImageFilenamesD[ni],CV_LOAD_IMAGE_UNCHANGED);
         double tframe = vTimestamps[ni];
@@ -94,7 +106,7 @@ int main(int argc, char **argv)
         std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
 #endif
 
-        // Pass the image to the SLAM system
+        // 4.2：进行SLAM
         SLAM.TrackRGBD(imRGB,imD,tframe);
 
 #ifdef COMPILEDWITHC11
@@ -107,7 +119,7 @@ int main(int argc, char **argv)
 
         vTimesTrack[ni]=ttrack;
 
-        // Wait to load the next frame
+        // 4.3：加载下一张图片
         double T=0;
         if(ni<nImages-1)
             T = vTimestamps[ni+1]-tframe;

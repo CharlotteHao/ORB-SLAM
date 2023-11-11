@@ -41,14 +41,24 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Retrieve paths to images
+    /**
+     * *step1：读取数据集
+     * LoadImages函数：读取数据集里的图片以及图片对应的时间戳。数据集里rgb.txt中存放着这些数据
+     * vstrImageFilenames：传出参数，存放图片文件路径的vector 
+     * vTimestamps：传出参数，存放图片对应的时间戳的vector
+     */ 
     vector<string> vstrImageFilenames;
-    vector<double> vTimestamps;
-    string strFile = string(argv[3])+"/rgb.txt";
+    vector<double> vTimestamps;  
+    string strFile = string(argv[3])+"/rgb.txt"; //读取数据集里的rgb.txt
     LoadImages(strFile, vstrImageFilenames, vTimestamps);
 
-    int nImages = vstrImageFilenames.size();
+    int nImages = vstrImageFilenames.size();//图像总数
 
+
+
+    /**
+     * *step2：创建SLAM系统
+    */
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
 
@@ -60,10 +70,18 @@ int main(int argc, char **argv)
     cout << "Start processing sequence ..." << endl;
     cout << "Images in the sequence: " << nImages << endl << endl;
 
+
+
     // Main loop
     cv::Mat im;
+    /**
+     * 循环读取图片 
+     *      nImages：图像数  
+     *      vTimestamps：vector类型，存放每一幅图像的时间戳
+     *      im：读取到的每一幅图像，与vTimestamps一一对应
+     * */
     for(int ni=0; ni<nImages; ni++)
-    {
+    {//for begin
         // Read image from file
         im = cv::imread(string(argv[3])+"/"+vstrImageFilenames[ni],CV_LOAD_IMAGE_UNCHANGED);
         double tframe = vTimestamps[ni];
@@ -81,8 +99,10 @@ int main(int argc, char **argv)
         std::chrono::monotonic_clock::time_point t1 = std::chrono::monotonic_clock::now();
 #endif
 
+
         // Pass the image to the SLAM system
         SLAM.TrackMonocular(im,tframe);
+        
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -103,7 +123,9 @@ int main(int argc, char **argv)
 
         if(ttrack<T)
             usleep((T-ttrack)*1e6);
-    }
+    }//for end
+
+
 
     // Stop all threads
     SLAM.Shutdown();
