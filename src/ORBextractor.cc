@@ -513,7 +513,7 @@ ORBextractor::ORBextractor(
 
     /**
      * ?step2: 计算图像金字塔每一层要提取的特征点数目
-     * ?计算原理在课件2.5中
+     * ?计算原理在课件2.5中P18
     */
     //mnFeaturesPerLevel 存放每一层要提取的特征点数目
     mnFeaturesPerLevel.resize(nlevels);
@@ -530,10 +530,10 @@ ORBextractor::ORBextractor(
     //分配给最后一层的特征点数目 = 总提取数 - 已分配给第0层到倒数第二层的特征点数目
     mnFeaturesPerLevel[nlevels-1] = std::max(nfeatures - sumFeatures, 0);   
 
-    //计算描述子需要的点的个数。上面数组中(256*2*2)存储的是坐标
+    //计算描述子需要的点的个数。上面数组中(256*2*2)存储的是坐标,256bit的描述子
     const int npoints = 512;
     /**
-     * 获取计算BRIEF描述子的随即采样点点集的指针
+     * !获取计算BRIEF描述子的随即采样点点集的指针
      * pattern0是Point*，bit_pattern_31_是int类型，所以需要强制转换
      */
     const Point* pattern0 = (const Point*)bit_pattern_31_;
@@ -965,11 +965,12 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree( //返回值是一个保存
 }
 
 /**
- * 
+ * 特征点的提取和分配
 */
 void ORBextractor::ComputeKeyPointsOctTree(
-    vector<vector<KeyPoint> >& allKeypoints //第一层存储的是某图层里面所有的特征点
-    )                                       //第二层存储的是整个图像金字塔中的所有特征点
+    vector<vector<KeyPoint> >& allKeypoints //传出参数
+    )                                       //第一层存储的是某图层里面所有的特征点
+                                            //第二层存储的是整个图像金字塔中的所有特征点
 {
     allKeypoints.resize(nlevels);
 
@@ -1032,7 +1033,7 @@ void ORBextractor::ComputeKeyPointsOctTree(
 
                 //这个向量存储这个网格的关键点
                 vector<cv::KeyPoint> vKeysCell;
-                //调用OpenCV的库函数
+                //!调用OpenCV的库函数
                 FAST(mvImagePyramid[level].rowRange(iniY,maxY).colRange(iniX,maxX), //代提取的网格
                      vKeysCell,     //存储关键点的容器 
                      iniThFAST,     //检测的阈值
@@ -1465,6 +1466,7 @@ void ORBextractor::ComputePyramid(cv::Mat image)
         
         //声明两个临时变量，第一个和扩展图像相同大小；第二个作为掩膜，但后面未使用到它
         Mat temp(wholeSize, image.type()), masktemp;
+
         //temp图像中间的原图浅copy给图像金字塔该图层的图像
         /**
          * Rect(int x, int y, int width, int height);

@@ -75,7 +75,7 @@ int main(int argc, char **argv)
     // Main loop
     cv::Mat im;
     /**
-     * 循环读取图片 
+     * *step3：循环读取图片，对每帧图片进行跟踪  
      *      nImages：图像数  
      *      vTimestamps：vector类型，存放每一幅图像的时间戳
      *      im：读取到的每一幅图像，与vTimestamps一一对应

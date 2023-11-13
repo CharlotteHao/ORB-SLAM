@@ -193,6 +193,7 @@ Frame::Frame(
     // *step1: 获取帧的ID
     //nNextId初始值为0
     mnId=nNextId++;
+    
 
     // *step2：获取图像金字塔的参数
     //获取图像金字塔的层数

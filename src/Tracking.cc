@@ -156,9 +156,9 @@ Tracking::Tracking(
 
     // Load ORB parameters
     /**
-     * *step2：加载ORB特帧点有关的参数，并新建特征点提取器
+     * *step2：加载ORB特帧点有关的参数
     */
-    //每一帧提取的特帧点数 T UM1配置文件中指定为1000
+    //每一帧提取的特帧点数 TUM1配置文件中指定为1000
     int nFeatures = fSettings["ORBextractor.nFeatures"];
     //图像建立金字塔时的变化尺度  单目TUM1配置文件中指定为1.2
     float fScaleFactor = fSettings["ORBextractor.scaleFactor"];
@@ -169,6 +169,9 @@ Tracking::Tracking(
     //如果默认阈值提取不出足够的特征点，则使用最小阈值  单目TUM1配置文件中指定为7
     int fMinThFAST = fSettings["ORBextractor.minThFAST"];
 
+    /**
+     * *step3：创建特征点提取器
+    */
     //tracking过程中，不管单目，双目还是RGBD，都会用到mpORBextractorLeft作为特帧点提取器
     mpORBextractorLeft = new ORBextractor(
         nFeatures,          //参数的含义看上面注释
