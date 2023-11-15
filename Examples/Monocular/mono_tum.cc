@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     }
 
     /**
-     * *step1：读取数据集
+     * *step1：加载数据集
      * LoadImages函数：读取数据集里的图片以及图片对应的时间戳。数据集里rgb.txt中存放着这些数据
      * vstrImageFilenames：传出参数，存放图片文件路径的vector 
      * vTimestamps：传出参数，存放图片对应的时间戳的vector
@@ -88,8 +88,7 @@ int main(int argc, char **argv)
 
         if(im.empty())
         {
-            cerr << endl << "Failed to load image at: "
-                 << string(argv[3]) << "/" << vstrImageFilenames[ni] << endl;
+            cerr << endl << "Failed to load image at: " << string(argv[3]) << "/" << vstrImageFilenames[ni] << endl;
             return 1;
         }
 
