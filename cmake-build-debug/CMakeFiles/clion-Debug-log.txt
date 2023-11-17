@@ -1,4 +1,4 @@
-/usr/myapp/clion-2023.2.2/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/usr/myapp/clion-2023.2.2/bin/ninja/linux/x64/ninja -G Ninja -S /home/shaohao/my_study/ORB-SLAM2_study/ORB_SLAM2 -B /home/shaohao/my_study/ORB-SLAM2_study/ORB_SLAM2/cmake-build-debug
+"C:\Program Files\JetBrains\CLion 2023.1.3\bin\cmake\win\x64\bin\cmake.exe" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=C:/app/mingw64/bin/mingw32-make.exe -DCMAKE_C_COMPILER=C:/app/mingw64/bin/gcc.exe -DCMAKE_CXX_COMPILER=C:/app/mingw64/bin/g++.exe -G "CodeBlocks - MinGW Makefiles" -S C:\Users\17714\Desktop\自学\ORB_SLAM_study\ORB-SLAM -B C:\Users\17714\Desktop\自学\ORB_SLAM_study\ORB-SLAM\cmake-build-debug
 CMake Deprecation Warning at CMakeLists.txt:1 (cmake_minimum_required):
   Compatibility with CMake < 2.8.12 will be removed from a future version of
   CMake.
@@ -7,31 +7,28 @@ CMake Deprecation Warning at CMakeLists.txt:1 (cmake_minimum_required):
   CMake that the project does not need compatibility with older versions.
 
 
--- The C compiler identification is GNU 9.4.0
--- The CXX compiler identification is GNU 9.4.0
+-- The C compiler identification is GNU 8.1.0
+-- The CXX compiler identification is GNU 8.1.0
 -- Detecting C compiler ABI info
 -- Detecting C compiler ABI info - done
--- Check for working C compiler: /usr/bin/cc - skipped
+-- Check for working C compiler: C:/app/mingw64/bin/gcc.exe - skipped
 -- Detecting C compile features
 -- Detecting C compile features - done
 -- Detecting CXX compiler ABI info
 -- Detecting CXX compiler ABI info - done
--- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Check for working CXX compiler: C:/app/mingw64/bin/g++.exe - skipped
 -- Detecting CXX compile features
 -- Detecting CXX compile features - done
 Build type: Debug
 -- Performing Test COMPILER_SUPPORTS_CXX11
--- Performing Test COMPILER_SUPPORTS_CXX11 - Success
+-- Performing Test COMPILER_SUPPORTS_CXX11 - Failed
 -- Performing Test COMPILER_SUPPORTS_CXX0X
--- Performing Test COMPILER_SUPPORTS_CXX0X - Success
--- Using flag -std=c++14.
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD
--- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Failed
--- Looking for pthread_create in pthreads
--- Looking for pthread_create in pthreads - not found
--- Looking for pthread_create in pthread
--- Looking for pthread_create in pthread - found
--- Found Threads: TRUE  
--- Configuring done (0.8s)
--- Generating done (0.0s)
--- Build files have been written to: /home/shaohao/my_study/ORB-SLAM2_study/ORB_SLAM2/cmake-build-debug
+-- Performing Test COMPILER_SUPPORTS_CXX0X - Failed
+CMake Error at CMakeLists.txt:28 (message):
+  The compiler C:/app/mingw64/bin/g++.exe has no C++14 support.  Please use a
+  different C++ compiler.
+
+
+-- Configuring incomplete, errors occurred!
+See also "C:/Users/17714/Desktop/自学/ORB_SLAM_study/ORB-SLAM/cmake-build-debug/CMakeFiles/CMakeOutput.log".
+See also "C:/Users/17714/Desktop/自学/ORB_SLAM_study/ORB-SLAM/cmake-build-debug/CMakeFiles/CMakeError.log".
