@@ -58,7 +58,6 @@ System::System(
     "This program comes with ABSOLUTELY NO WARRANTY;" << endl  <<
     "This is free software, and you are welcome to redistribute it" << endl <<
     "under certain conditions. See LICENSE.txt." << endl << endl;
-
     //输出传感器类型
     cout << "Input sensor was set to: ";
     if(mSensor==MONOCULAR)
@@ -83,7 +82,7 @@ System::System(
 
 
     /**
-     * *step2：创建ORB词袋
+     * *step2：加载ORB词袋
      */
     cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
     //建立一个新的ORB词袋
@@ -154,6 +153,7 @@ System::System(
     }
 
     //Set pointers between threads
+    // 设置线程间的指针
     mpTracker->SetLocalMapper(mpLocalMapper);
     mpTracker->SetLoopClosing(mpLoopCloser);
 
@@ -267,6 +267,10 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
 }
 
 //输入为单目图像时的追踪器接口
+/**
+ * todo step1：模式判断，是否关闭局部建图线程
+ * todo step2：获取相机位姿估计的结果
+ */
 cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
 {
     if(mSensor!=MONOCULAR)
@@ -275,7 +279,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
         exit(-1);
     }
 
-    // 模式判断
+    // *step1：模式判断
     {
         //互斥锁，出了{}则释放该锁，为了防止mbActivateLocalizationMode和mbDeactivateLocalizationMode的值发生混乱
         unique_lock<mutex> lock(mMutexMode);
@@ -315,7 +319,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
         }
     }
 
-    //获取相机位姿估计的结果
+    // *step2：获取相机位姿估计的结果
     /**
      * 参数一：图片
      * 参数二：该图片对应的时间戳

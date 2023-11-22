@@ -200,7 +200,7 @@ static void computeOrbDescriptor(const KeyPoint& kpt,   //要计算描述子的�
 */
 static int bit_pattern_31_[256*4] =
 {
-    8,-3, 9,5/*mean (0), correlation (0)*/,
+    8,-3, 9,    5/*mean (0), correlation (0)*/,
     4,2, 7,-12/*mean (1.12461e-05), correlation (0.0437584)*/,
     -11,9, -8,2/*mean (3.37382e-05), correlation (0.0617409)*/,
     7,-12, 12,-13/*mean (5.62303e-05), correlation (0.0636977)*/,
@@ -503,7 +503,7 @@ ORBextractor::ORBextractor(
     mvInvLevelSigma2.resize(nlevels);
     for(int i=0; i<nlevels; i++)
     {
-        mvInvScaleFactor[i]=1.0f/mvScaleFactor[i];
+        mvInvScaleFactor[i]=1.0f/mvScaleFactor[i]; //取倒数
         mvInvLevelSigma2[i]=1.0f/mvLevelSigma2[i];
     }
 
@@ -549,10 +549,11 @@ ORBextractor::ORBextractor(
     //This is for orientation
     // pre-compute the end of a row in a circular patch
     /**
-     * ?step3: 计算灰度心圆中，每一行像素的umax值
+     * ?step3: 计算灰度心圆中，每一行像素的umax值，计算特征点方向信息时用到
      * 预先计算圆形patch中行的结束位置
      * umax：vector类型 HALF_PATCH_SIZE的值为15，即半径为15，所以umax的长度为16
      * umax：1/4圆的每一行的u轴坐标边界
+     * HALF_PATCH_SIZE=15
     */
     umax.resize(HALF_PATCH_SIZE + 1);
 
@@ -586,6 +587,8 @@ ORBextractor::ORBextractor(
     }
 }
 
+
+
 /**
  * 计算特征点的方向,实现特征不变性
  * @param1  对应的图层的图像
@@ -594,6 +597,7 @@ ORBextractor::ORBextractor(
 */
 static void computeOrientation(const Mat& image, vector<KeyPoint>& keypoints, const vector<int>& umax)
 {
+    //在该层图像循环遍历每一个角点 计算方向信息
     for (vector<KeyPoint>::iterator keypoint = keypoints.begin(),
          keypointEnd = keypoints.end(); keypoint != keypointEnd; ++keypoint)
     {
@@ -969,8 +973,8 @@ vector<cv::KeyPoint> ORBextractor::DistributeOctTree( //返回值是一个保存
 */
 void ORBextractor::ComputeKeyPointsOctTree(
     vector<vector<KeyPoint> >& allKeypoints //传出参数
-    )                                       //第一层存储的是某图层里面所有的特征点
-                                            //第二层存储的是整个图像金字塔中的所有特征点
+    )                                       
+                                           
 {
     allKeypoints.resize(nlevels);
 
@@ -1056,7 +1060,7 @@ void ORBextractor::ComputeKeyPointsOctTree(
                     for(vector<cv::KeyPoint>::iterator vit=vKeysCell.begin(); vit!=vKeysCell.end();vit++)
                     {   
                         //FAST函数提取出来的角点都是基于cell网格的。要将其恢复到在图像中的坐标
-                        //在下面使用八叉树法整理特征点的时候会使用到这个坐标
+                        //*在下面使用4叉树法整理特征点的时候会使用到这个坐标
                         (*vit).pt.x+=j*wCell;
                         (*vit).pt.y+=i*hCell;
                         //然后将其加入到“等待被分配”特征点容器中
@@ -1065,7 +1069,7 @@ void ORBextractor::ComputeKeyPointsOctTree(
                 }
 
             }
-        }//到这里实现对当前图像的所有网格进行FAST关键点提取
+        }//!到这里实现对当前图像的所有网格进行FAST关键点提取
 
         //声明一个对存储当前图层特征点的容器的引用
         //引用& 所以修改了keypoints 也就修改了allKeypoints[level]
@@ -1073,7 +1077,7 @@ void ORBextractor::ComputeKeyPointsOctTree(
         //调整其大小
         keypoints.reserve(nfeatures);
 
-        //根据mnFeaturesPerLevel(存储每一层图像应提取的特征点数目)，对多余的特征点进行剔除
+        //根据mnFeaturesPerLevel(存储每一层图像应提取的特征点数目)，使用4叉树法对多余的特征点进行剔除
         /**
          * 返回值是一个保存特征点的容器，含有经过剔除后保留下来的特征点
          * 得到的特征点的坐标，依然是基于当前图像帧讲的
@@ -1319,6 +1323,14 @@ static void computeDescriptors(
 
 
 //重载()运算符的仿函数
+/**
+ * todo step1：判断图像是否为单通道的灰度图
+ * todo step2：计算图像金字图
+ * todo step3: 特征点的提取和分配
+ * todo step4: 计算描述子
+ * todo step5：对图像进行高斯模糊，计算高斯模糊后图像特征点的描述子
+ * todo step6：对非0层图像中的特征点的坐标恢复到第0层图像的坐标系下
+ */
 void ORBextractor::operator()( 
     InputArray _image,              //输入的图像
     InputArray _mask,               //用于辅助进行图像处理的掩膜
@@ -1333,7 +1345,10 @@ void ORBextractor::operator()(
     Mat image = _image.getMat();
     assert(image.type() == CV_8UC1 );
 
+
+
     //  *step2：计算图像金字图
+    // 利用前面计算的缩放因子，循环计算每一层图像的大小，并将图像都居中
     // Pre-compute the scale pyramid
     ComputePyramid(image);
 
@@ -1413,7 +1428,7 @@ void ORBextractor::operator()(
         
         //desc 存储当前图层的描述子
         Mat desc = descriptors.rowRange(offset, offset + nkeypointsLevel);
-        // *step6：计算高斯模糊后图像特征点的描述子
+        // *计算高斯模糊后图像特征点的描述子
         computeDescriptors(
             workingMat,     //高斯模糊之后的图层图像
             keypoints,      //当前图层的特征点集合
@@ -1426,7 +1441,7 @@ void ORBextractor::operator()(
 
 
         /**
-         * *step：对非0层图像中的特征点的坐标恢复到第0层图像的坐标系下
+         * *step6：对非0层图像中的特征点的坐标恢复到第0层图像的坐标系下
          * *得到所有层特征点在第0层里的坐标放到_keypoints里面
          * */ 
         if (level != 0)
@@ -1460,6 +1475,7 @@ void ORBextractor::ComputePyramid(cv::Mat image)
         float scale = mvInvScaleFactor[level];
         //计算本层图像的像素尺寸大小
         Size sz(cvRound((float)image.cols*scale), cvRound((float)image.rows*scale));
+
         //在已计算的本层图像的像素尺寸再向外扩展 长和高都延长EDGE_THRESHOLD*2的长度
         Size wholeSize(sz.width + EDGE_THRESHOLD*2, sz.height + EDGE_THRESHOLD*2);
 

@@ -170,7 +170,15 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
     AssignFeaturesToGrid();
 }
 
-
+/**
+ * todo step1：获取帧的ID
+ * todo step1：获取图像金字塔的参数
+ * todo step1：对这个单目图像进行特征提取操作
+ * todo step1：
+ * todo step1：
+ * todo step1：
+ * todo step1：
+ */
 Frame::Frame(
         const cv::Mat &imGray,      //度图
         const double &timeStamp,    //时间戳
@@ -195,6 +203,7 @@ Frame::Frame(
     mnId=nNextId++;
     
 
+
     // *step2：获取图像金字塔的参数
     //获取图像金字塔的层数
     mnScaleLevels = mpORBextractorLeft->GetLevels();    
@@ -211,15 +220,17 @@ Frame::Frame(
     //获取各层图像的sigma^2的倒数 todo:暂时不知道有什么用
     mvInvLevelSigma2 = mpORBextractorLeft->GetInverseScaleSigmaSquares();
 
+
     
     // *step3：对这个单目图像进行特征提取操作 0-左目 1-右目
     // ORB extraction
     ExtractORB(0,imGray);
 
     N = mvKeys.size();
-
     if(mvKeys.empty())
         return;
+
+
 
     // *step4：用OpenCV的矫正函数，内参对提取到的特征点进行矫正
     UndistortKeyPoints();
@@ -232,6 +243,8 @@ Frame::Frame(
     mvpMapPoints = vector<MapPoint*>(N,static_cast<MapPoint*>(NULL));
     //记录地图点是否为外点，初始化都为外点false
     mvbOutlier = vector<bool>(N,false);
+
+
 
     // *step5：计算区畸变后图像的边界，将特征点分配到网格中。这个过程一般是在第一帧或者时相机标定参数发生变化之后进行的
     //通过mbInitialComputations标志来实现

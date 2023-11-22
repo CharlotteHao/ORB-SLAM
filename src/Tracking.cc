@@ -48,7 +48,7 @@ namespace ORB_SLAM2
  * todo step1: 从配置文件TUMX.yaml中，加载相机参数(如K，图像校正参数，双目摄像头baseline和相机的帧频率等)
  * todo step2: 加载ORB特帧点有关的参数。（如：特帧点数，金字塔的变化尺度，金字塔的层数，关键点的阈值等等)。并新建相应传感器的特征点提取器
  */ 
-Tracking::Tracking(
+Tracking::  Tracking(
     System *pSys,                   //系统实例
     ORBVocabulary* pVoc,            //BOW字典
     FrameDrawer *pFrameDrawer,      //帧绘画器
@@ -156,18 +156,24 @@ Tracking::Tracking(
 
     // Load ORB parameters
     /**
-     * *step2：加载ORB特帧点有关的参数
+     * *step2：加载与ORB特帧点有关的参数
     */
-    //每一帧提取的特帧点数 TUM1配置文件中指定为1000
+    //每一帧图像要提取的特帧点的数数量 TUM1配置文件中指定为1000
     int nFeatures = fSettings["ORBextractor.nFeatures"];
-    //图像建立金字塔时的变化尺度  单目TUM1配置文件中指定为1.2
+
+    //每一帧图像建立图像金字塔时的变化尺度  单目TUM1配置文件中指定为1.2
     float fScaleFactor = fSettings["ORBextractor.scaleFactor"];
-    //图像金字塔的层数  单目TUM1配置文件中指定为8
+
+    //每一帧图像的图像金字塔的层数  单目TUM1配置文件中指定为8
     int nLevels = fSettings["ORBextractor.nLevels"];
+
     //提取ORB特帧中的fast关键点的默认阈值  单目TUM1配置文件中指定为20
     int fIniThFAST = fSettings["ORBextractor.iniThFAST"];
+
     //如果默认阈值提取不出足够的特征点，则使用最小阈值  单目TUM1配置文件中指定为7
     int fMinThFAST = fSettings["ORBextractor.minThFAST"];
+
+
 
     /**
      * *step3：创建特征点提取器
@@ -180,14 +186,13 @@ Tracking::Tracking(
         fIniThFAST,
         fMinThFAST);
 
-
     //如果是双目，tracking过程中都会用到mpORBextractorRight作为右目的特帧点提取器
     if(sensor==System::STEREO)
         mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
     //在单目初始化的时候，会用mpIniORBextractor来作为特帧点提取器
     if(sensor==System::MONOCULAR)
-        //单目初始化的时候要提取两倍的nFeatures数量的特征点
+        //!单目初始化的时候要提取两倍的nFeatures数量的特征点
         mpIniORBextractor = new ORBextractor(2*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
     //输出信息
@@ -305,15 +310,19 @@ cv::Mat Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const d
 }
 
 
-
+/**
+ * todo step1：将单目图像转换为灰度图
+ * todo step2：构造Frame
+ * todo step3：跟踪
+ */
 cv::Mat Tracking::GrabImageMonocular(
-    const cv::Mat &im,      //单目图像
-    const double &timestamp //时间戳
+    const cv::Mat &im,       //单目图像
+    const double &timestamp  //时间戳
     )
 {
     mImGray = im;
 
-    //step1：如果是3通道的RGB或者是四通道的RGBA，都要转换为单通道的灰度图
+    // *step1：如果是3通道的RGB或者是四通道的RGBA，都要转换为单通道的灰度图
     if(mImGray.channels()==3)
     {
         if(mbRGB)
@@ -329,12 +338,13 @@ cv::Mat Tracking::GrabImageMonocular(
             cvtColor(mImGray,mImGray,CV_BGRA2GRAY);
     }
 
-    // step2：构造Frame
+    // *step2：构造Frame
+    //如果还没初始化
     if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
         mCurrentFrame = Frame(
             mImGray,            //灰度图
             timestamp,          //时间戳
-            mpIniORBextractor,  //ORB特征提取器
+            mpIniORBextractor,  //ORB特征提取器，这个时初始化时的提取器，区别2*nFeather
             mpORBVocabulary,    //ORB词袋
             mK,                 //相机外参K
             mDistCoef,          //畸变参数
@@ -353,8 +363,14 @@ cv::Mat Tracking::GrabImageMonocular(
             mThDepth
         );
 
+
+
+    /**
+     * *step3：跟踪
+     */
     Track();
 
+    //? 返回当前帧的位姿
     return mCurrentFrame.mTcw.clone();
 }
 

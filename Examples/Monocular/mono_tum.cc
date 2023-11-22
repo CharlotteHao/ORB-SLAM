@@ -100,7 +100,9 @@ int main(int argc, char **argv)
 
 
         // Pass the image to the SLAM system
+        // 对每帧图片进行跟踪  
         SLAM.TrackMonocular(im,tframe);
+        
         
 
 #ifdef COMPILEDWITHC11
