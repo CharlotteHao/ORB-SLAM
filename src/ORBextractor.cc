@@ -130,6 +130,8 @@ static float IC_Angle(const Mat& image, Point2f pt,  const vector<int> & u_max)
     return fastAtan2((float)m_01, (float)m_10);
 }
 
+
+
 //乘数因子 一度对应多少弧度
 const float factorPI = (float)(CV_PI/180.f);
 //计算某个特征点的描述子
@@ -978,7 +980,7 @@ void ORBextractor::ComputeKeyPointsOctTree(
 {
     allKeypoints.resize(nlevels);
 
-    //将图像分成若干个 30x30 的网格
+    //*step1：将图像分成若干个 30x30 的网格
     const float W = 30;
 
     //遍历每一层图像
@@ -1043,7 +1045,8 @@ void ORBextractor::ComputeKeyPointsOctTree(
                      iniThFAST,     //检测的阈值
                      true           //使能非极大值抑制
                 );
-
+                    
+                //*step2：遍历所有网格，在网格中提取FAST关键点
                 //如果使用阈值iniThFAST不能检测出关键点，则使用更低的阈值来重新进行检测
                 if(vKeysCell.empty())
                 {
@@ -1082,6 +1085,7 @@ void ORBextractor::ComputeKeyPointsOctTree(
          * 返回值是一个保存特征点的容器，含有经过剔除后保留下来的特征点
          * 得到的特征点的坐标，依然是基于当前图像帧讲的
         */
+        //*step3：对每一层的图像剔除特征点，使特征点均匀分布 
         keypoints = DistributeOctTree(
             vToDistributeKeys,          //待剔除的特征点集
             minBorderX, 
@@ -1098,7 +1102,7 @@ void ORBextractor::ComputeKeyPointsOctTree(
         // Add border to coordinates and scale information
         //剔除后的特征点数目
         const int nkps = keypoints.size();
-        //遍历剔除后的特征，恢复其在当前图层图像坐标系下的坐标
+        //*step4：遍历剔除后的特征，恢复其在当前图层图像坐标系下的坐标
         for(int i=0; i<nkps ; i++)
         {   
             //对于每一个保留下来的特征点，恢复到相对于当前图层“边缘扩充图像下”的坐标系的坐标
@@ -1111,7 +1115,7 @@ void ORBextractor::ComputeKeyPointsOctTree(
         }
     }
 
-    // 循环分层计算，计算特征点的方向信息
+    //*step5：循环分层计算，计算特征点的方向信息
     for (int level = 0; level < nlevels; ++level)
         computeOrientation(
             mvImagePyramid[level],  //对应的图层的图像
