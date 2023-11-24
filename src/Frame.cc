@@ -213,6 +213,7 @@ Frame::Frame(
     mfLogScaleFactor = log(mfScaleFactor);
     //获取各层图像的缩放因子，mvScaleFactors为vector容器
     mvScaleFactors = mpORBextractorLeft->GetScaleFactors();
+
     //获取各层图像的缩放因子的倒数，mvInvScaleFactors为vector容器
     mvInvScaleFactors = mpORBextractorLeft->GetInverseScaleFactors();
     //获取各层图像的sigma^2 todo:暂时不知道有什么用
@@ -232,7 +233,7 @@ Frame::Frame(
 
 
 
-    // *step4：用OpenCV的矫正函数，内参对提取到的特征点进行矫正
+    // *step4：用OpenCV的矫正函数，对提取到的特征点进行矫正
     UndistortKeyPoints();
 
     //由于时单目摄像机，所以这里给有图像和图像深度赋值为-1，表示没有相关信息
@@ -277,12 +278,17 @@ Frame::Frame(
     AssignFeaturesToGrid();
 }
 
+
+
+
+
+
 /**
  * 将提取的ORB特征点分配到图像网格中
 */
 void Frame::AssignFeaturesToGrid()
 {   
-    // *step1：给存储特征点的网格数组分配科技
+    // *step1：给存储特征点的网格数组分配空间
     //FRAME_GRID_COLS=64 FRAME_GRID_ROWS=48
     int nReserve = 0.5f*N/(FRAME_GRID_COLS*FRAME_GRID_ROWS);
     //开始对mGrid这个二维数组中的每一个vector元素分配空间

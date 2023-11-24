@@ -48,7 +48,7 @@ namespace ORB_SLAM2
  * todo step1: 从配置文件TUMX.yaml中，加载相机参数(如K，图像校正参数，双目摄像头baseline和相机的帧频率等)
  * todo step2: 加载ORB特帧点有关的参数。（如：特帧点数，金字塔的变化尺度，金字塔的层数，关键点的阈值等等)。并新建相应传感器的特征点提取器
  */ 
-Tracking::  Tracking(
+Tracking::Tracking(
     System *pSys,                   //系统实例
     ORBVocabulary* pVoc,            //BOW字典
     FrameDrawer *pFrameDrawer,      //帧绘画器
@@ -375,7 +375,10 @@ cv::Mat Tracking::GrabImageMonocular(
 }
 
 
-
+/**
+ * Tracking线程
+ * Track()包含两部分：估计运动、跟踪局部地图
+ */
 void Tracking::Track()
 {
     if(mState==NO_IMAGES_YET)
@@ -388,11 +391,14 @@ void Tracking::Track()
     // Get Map Mutex -> Map cannot be changed
     unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
 
+
+    //*step1:初始化
     if(mState==NOT_INITIALIZED)
     {
         if(mSensor==System::STEREO || mSensor==System::RGBD)
             StereoInitialization();
         else
+            //!单目初始化
             MonocularInitialization();
 
         mpFrameDrawer->Update(this);
@@ -672,16 +678,31 @@ void Tracking::StereoInitialization()
     }
 }
 
+/**
+ * @brief 单目的地图初始化
+ * 并行地计算基础矩阵和单应矩阵，选取其中一个模型，恢复出最开始两帧之间的相对姿态以及点云
+ * 得到初始两帧的匹配、相对运动、初始MapPoint
+ */
 void Tracking::MonocularInitialization()
 {
-
+    /**
+     * *step1:如果单目初始化器还没被创建，则创建。
+     * !初始化时的第一帧执行if里的语句
+     * !初始化用的第二帧执行else里的语句
+     */
+    //后面如果重新初始化时会清掉这个
     if(!mpInitializer)
     {
         // Set Reference Frame
+        //!单目初始帧的特征点必须大于100个
         if(mCurrentFrame.mvKeys.size()>100)
-        {
+        {   
+            //初始化需要两帧 mInitialFrame和mCurrentFrame
             mInitialFrame = Frame(mCurrentFrame);
+            //用当前帧更新上一帧
             mLastFrame = Frame(mCurrentFrame);
+
+            //mvbPrevMatched记录上一帧的所有特侦点
             mvbPrevMatched.resize(mCurrentFrame.mvKeysUn.size());
             for(size_t i=0; i<mCurrentFrame.mvKeysUn.size(); i++)
                 mvbPrevMatched[i]=mCurrentFrame.mvKeysUn[i].pt;
@@ -689,29 +710,48 @@ void Tracking::MonocularInitialization()
             if(mpInitializer)
                 delete mpInitializer;
 
+            //由当前帧构造一个初始化器
             mpInitializer =  new Initializer(mCurrentFrame,1.0,200);
-
+            
+            //初始化为-1表示没有任何匹配。
+            //这里面存储的是匹配的点的id 
             fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
 
+            //退出此函数
             return;
         }
     }
     else
     {
-        // Try to initialize
+        // !初始化进来的第二帧的特侦点数也要大于100
         if((int)mCurrentFrame.mvKeys.size()<=100)
         {
+            //若小于100，则删除前面第一帧创建的初始化器
             delete mpInitializer;
             mpInitializer = static_cast<Initializer*>(NULL);
+            //-1表示没有任何匹配。
             fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
+            //退出，重新找初始化的一二帧
             return;
         }
 
-        // Find correspondences
-        ORBmatcher matcher(0.9,true);
-        int nmatches = matcher.SearchForInitialization(mInitialFrame,mCurrentFrame,mvbPrevMatched,mvIniMatches,100);
+        // *step3:创建匹配器，在第一帧mInitialFrame和第二帧mCurrentFrame中找到匹配的特征点对
+        ORBmatcher matcher(
+            0.9,    //最佳的和次佳特征点评分的比值阈值，这里比较宽松，跟踪时一般是0.7
+            true    //是否检查特征点的方向
+        );
+        /**
+         * !对第一帧mInitialFrame和第二帧mCurrentFrame进行特征点匹配
+         * *mvbPrevMatched初始化存储的是第一帧mInitialFrame中特征点的坐标，匹配后存储的是匹配好的当前帧mCurrentFrame的特征点的坐标
+         */
+        int nmatches = matcher.SearchForInitialization(
+            mInitialFrame,mCurrentFrame, //初始化时用到的两帧，mInitialFrame是第一帧，称位参考帧；mCurrentFrame是当前帧
+            mvbPrevMatched, //初始值为参考帧中的特征点
+            mvIniMatches,   //保存匹配关系。保存参考帧F1中特侦点是否匹配得上，该容器的索引是对应F1特征点的索引，值保存的是匹配好的当前帧F2特征点的索引
+            100             //搜索窗口大小
+        );
 
-        // Check if there are enough correspondences
+        //*step4:验证匹配结果，如果初始化两帧之间的匹配点太少，则重新初始化
         if(nmatches<100)
         {
             delete mpInitializer;
@@ -723,8 +763,20 @@ void Tracking::MonocularInitialization()
         cv::Mat tcw; // Current Camera Translation
         vector<bool> vbTriangulated; // Triangulated Correspondences (mvIniMatches)
 
-        if(mpInitializer->Initialize(mCurrentFrame, mvIniMatches, Rcw, tcw, mvIniP3D, vbTriangulated))
+        /**
+         * *step5:通过H矩阵或F矩阵，进行单目初始化，得到两帧间的相对运动和初始化MapPoints
+         * 
+         */
+        if(mpInitializer->Initialize(
+                mCurrentFrame, //单前帧
+                mvIniMatches,  //参考帧
+                Rcw, tcw,   //初始化得到的相机位姿 
+                mvIniP3D,   //进行三角化得到的空间点集合
+                vbTriangulated //对于参考帧来讲，其中哪些点被三角化了
+            )
+        )
         {
+            // *step6：初始化成功后，删除那些无法进行三角化的匹配点
             for(size_t i=0, iend=mvIniMatches.size(); i<iend;i++)
             {
                 if(mvIniMatches[i]>=0 && !vbTriangulated[i])
@@ -734,13 +786,14 @@ void Tracking::MonocularInitialization()
                 }
             }
 
-            // Set Frame Poses
+            // *step7：初始化成功后，将初始化的第一帧作为世界坐标系，因此第一帧变化矩阵T为单位矩阵
             mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
             cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
             Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
             tcw.copyTo(Tcw.rowRange(0,3).col(3));
             mCurrentFrame.SetPose(Tcw);
 
+            //*step8:创建初始化地图点MapPoints
             CreateInitialMapMonocular();
         }
     }

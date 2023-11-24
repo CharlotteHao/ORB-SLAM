@@ -5,7 +5,10 @@
         "chrono": "cpp",
         "system_error": "cpp",
         "vector": "cpp",
-        "list": "cpp"
+        "list": "cpp",
+        "xutility": "cpp",
+        "charconv": "cpp",
+        "*.rh": "cpp"
     },
     "workbench.colorCustomizations": {
         "activityBar.activeBackground": "#2f7c47",

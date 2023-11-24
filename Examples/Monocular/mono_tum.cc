@@ -25,7 +25,6 @@
 #include<chrono>
 
 #include<opencv2/core/core.hpp>
-
 #include<System.h>
 
 using namespace std;
@@ -72,14 +71,15 @@ int main(int argc, char **argv)
 
 
 
-    // Main loop
-    cv::Mat im;
+
+   
     /**
      * *step3：循环读取图片，对每帧图片进行跟踪  
      *      nImages：图像数  
      *      vTimestamps：vector类型，存放每一幅图像的时间戳
      *      im：读取到的每一幅图像，与vTimestamps一一对应
      * */
+    cv::Mat im;
     for(int ni=0; ni<nImages; ni++)
     {//for begin
         // Read image from file
@@ -147,6 +147,9 @@ int main(int argc, char **argv)
 
     return 0;
 }
+
+
+
 
 void LoadImages(const string &strFile, vector<string> &vstrImageFilenames, vector<double> &vTimestamps)
 {

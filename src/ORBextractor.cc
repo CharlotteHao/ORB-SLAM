@@ -520,6 +520,7 @@ ORBextractor::ORBextractor(
     //mnFeaturesPerLevel 存放每一层要提取的特征点数目
     mnFeaturesPerLevel.resize(nlevels);
     float factor = 1.0f / scaleFactor;
+    //nfeatures=1000
     float nDesiredFeaturesPerScale = nfeatures*(1 - factor)/(1 - (float)pow((double)factor, (double)nlevels));
 
     int sumFeatures = 0;    //统计第0层到到数第二层的分配的特征点数目
@@ -1085,6 +1086,9 @@ void ORBextractor::ComputeKeyPointsOctTree(
          * 返回值是一个保存特征点的容器，含有经过剔除后保留下来的特征点
          * 得到的特征点的坐标，依然是基于当前图像帧讲的
         */
+
+
+
         //*step3：对每一层的图像剔除特征点，使特征点均匀分布 
         keypoints = DistributeOctTree(
             vToDistributeKeys,          //待剔除的特征点集
@@ -1102,6 +1106,8 @@ void ORBextractor::ComputeKeyPointsOctTree(
         // Add border to coordinates and scale information
         //剔除后的特征点数目
         const int nkps = keypoints.size();
+
+
         //*step4：遍历剔除后的特征，恢复其在当前图层图像坐标系下的坐标
         for(int i=0; i<nkps ; i++)
         {   
@@ -1114,6 +1120,7 @@ void ORBextractor::ComputeKeyPointsOctTree(
             keypoints[i].size = scaledPatchSize;
         }
     }
+
 
     //*step5：循环分层计算，计算特征点的方向信息
     for (int level = 0; level < nlevels; ++level)
@@ -1368,7 +1375,7 @@ void ORBextractor::operator()(
 
 
     /**
-     * *step4: 计算描述子
+     * *step4: 循环遍历每一层图像，对图像进行高斯模糊，计算这层图像特征点的描述子
     */
     Mat descriptors;
 
@@ -1412,8 +1419,7 @@ void ORBextractor::operator()(
             continue;
 
        
-       
-        // *step5：对图像进行高斯模糊
+        // *!step5：对图像进行高斯模糊
         //深拷贝当前层的图像
         Mat workingMat = mvImagePyramid[level].clone();
         /**
@@ -1429,10 +1435,9 @@ void ORBextractor::operator()(
 
         
         
-        
-        //desc 存储当前图层的描述子
+        //desc 用来存储当前图层的描述子
         Mat desc = descriptors.rowRange(offset, offset + nkeypointsLevel);
-        // *计算高斯模糊后图像特征点的描述子
+        // *!计算高斯模糊后图像特征点的描述子
         computeDescriptors(
             workingMat,     //高斯模糊之后的图层图像
             keypoints,      //当前图层的特征点集合
